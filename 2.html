@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>three.js app</title>
+    <style>
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="./dat.gui/build/dat.gui.min.js"></script>
+    <script src="./stats.js/build/stats.min.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./three/build/three.module.js",
+          "three/addons/": "./three/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module">
+      // 现在浏览器支持ES6语法，自然包括import方式引入js文件
+      import * as THREE from "three";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      console.log(THREE);
+
+      let controls;
+      var control = {
+        positionX: 0,
+        positionY: 0,
+        positionZ: 0,
+      };
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x111111);
+      // Our Javascript will go here.
+      const camera = new THREE.PerspectiveCamera(
+        50,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.set(20, 10, 20);
+
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // 设置渲染器渲染阴影效果
+      renderer.setClearColor(new THREE.Color(0x000000));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+
+      const loader = new GLTFLoader();
+
+      var stats = new Stats();
+      document.body.appendChild(stats.dom);
+
+      function controlsCreate() {
+        controls = new OrbitControls(camera, renderer.domElement);
+        // 阻尼效果
+        controls.enableDamping = true;
+        // 摄像机自动旋转
+        controls.autoRotate = false;
+        // 控制垂直角度的旋转范围
+        controls;
+      }
+
+      function createHelper() {
+        // 创建坐标轴对象并设置长度
+        const axesHelper = new THREE.AxesHelper(5);
+        // 将坐标轴对象添加到场景中
+        scene.add(axesHelper);
+      }
+      var isadd1 = true;
+      var isadd2 = true;
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        // if (isadd1) {
+        //   spotLight1.position.y += 0.01;
+        //   if (spotLight1.position.y > 12) {
+        //     isadd1 = false;
+        //   }
+        // } else {
+        //   spotLight1.position.y -= 0.01;
+        //   if (spotLight1.position.y < 4) {
+        //     isadd1 = true;
+        //   }
+        // }
+
+        // if (isadd2) {
+        //   spotLight1.position.x += 0.01;
+        //   if (spotLight1.position.x > 6) {
+        //     isadd2 = false;
+        //   }
+        // } else {
+        //   spotLight1.position.x -= 0.01;
+        //   if (spotLight1.position.x < -8) {
+        //     isadd2 = true;
+        //   }
+        // }
+        stats.update(); //更新性能插件
+        mixer1.update(clock1.getDelta());
+        mixer2.update(clock2.getDelta());
+        mixer3.update(clock3.getDelta());
+        mixer4.update(clock4.getDelta());
+        moveOnCurve();
+
+        renderer.render(scene, camera);
+      }
+
+      // 实例化dat.GUI对象
+      var gui = new dat.GUI();
+      // 把需要修改的配置添加dat.GUI对象中
+      //gui.add(修改的配置对象, 配置对象中修改的数据名称, 修改数据边界的起始点, 修改数据边界的终止点)
+      // onChange: 只要数据发生了变化 就会触发onchange方法
+      gui.add(control, "positionX", -10, 10).onChange(updatePosition);
+      gui.add(control, "positionY", 1, 10).onChange(updatePosition);
+      gui.add(control, "positionZ", -10, 10).onChange(updatePosition);
+
+      // 定义更新模型位置函数
+      function updatePosition() {
+        // 设置网格在页面中的位置
+        cube.position.set(
+          control.positionX,
+          control.positionY,
+          control.positionZ
+        );
+      }
+      var mod1 = null;
+      var mod2 = null;
+      var mod3 = null;
+      var mod4 = null;
+      var mod5 = null;
+      var mod6 = null;
+      let mixer1 = null;
+      let mixer2 = null;
+      let mixer3 = null;
+      let mixer4 = null;
+      var clock4 = new THREE.Clock();
+      var clock1 = new THREE.Clock();
+      var clock2 = new THREE.Clock();
+      var clock3 = new THREE.Clock();
+      function addmod(mod, url, x, y, z, rx, ry) {
+        loader.load(url, function (gltf) {
+          mod = gltf.scene;
+          console.log(gltf);
+          mod.position.x = x;
+          mod.position.y = y;
+          mod.position.z = z;
+          mod.rotation.x = rx;
+          mod.rotation.y = ry;
+
+          if (mod) {
+            mod.traverse((child) => {
+              if (child instanceof THREE.Mesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+              }
+            });
+          }
+          scene.add(mod);
+          if (url == "model/mod5/scene.gltf") {
+            mod.scale.set(0.1, 0.1, 0.1);
+            mixer1 = new THREE.AnimationMixer(gltf.scene);
+            const action1 = mixer1.clipAction(gltf.animations[0]);
+            action1.play();
+          }
+
+          if (url == "model/mod4/scene.gltf") {
+            mixer2 = new THREE.AnimationMixer(gltf.scene);
+            const action2 = mixer2.clipAction(gltf.animations[0]);
+            action2.play();
+          }
+          if (url == "model/mod6/scene.gltf") {
+            mod.scale.set(0.01, 0.01, 0.01);
+            mixer3 = new THREE.AnimationMixer(gltf.scene);
+            const action3 = mixer3.clipAction(gltf.animations[0]);
+            action3.play();
+          }
+        });
+      }
+
+      var spotLight1 = new THREE.SpotLight(0xffffff);
+      spotLight1.position.set(0, 20, 0);
+      spotLight1.intensity = 500;
+      spotLight1.castShadow = true;
+      scene.add(spotLight1);
+      //   var spotLight2 = new THREE.SpotLight(0xffffff);
+      //   spotLight2.position.set(-10, -5, -10);
+      //   spotLight2.intensity = 100;
+      //   scene.add(spotLight2);
+
+      //   // 创建精灵材质
+      //   var spriteMaterialNormal = new THREE.SpriteMaterial({ color: 0x00ffff });
+      //   // 实例化精灵对象
+      //   var spriteNormal = new THREE.Sprite(spriteMaterialNormal);
+      //   //设置精灵对象的位置
+      //   spriteNormal.position.set(-10, 10, 10);
+      //   //设置精灵对象的缩放大小
+      //   spriteNormal.scale.set(5, 5, 1);
+      //   // 在场景中添加精灵
+      //   scene.add(spriteNormal);
+
+      const material1 = new THREE.LineBasicMaterial({ color: 0x0000ff });
+      const points = [];
+      points.push(new THREE.Vector3(-10, 0, 0));
+      points.push(new THREE.Vector3(0, 10, 0));
+      points.push(new THREE.Vector3(10, 0, 0));
+
+      //   const geometry1 = new THREE.BufferGeometry().setFromPoints(points);
+      //   const line = new THREE.Line(geometry1, material1);
+      //   scene.add(line);
+
+      const geometry2 = new THREE.BoxGeometry(2, 2, 2);
+      const material2 = new THREE.MeshLambertMaterial({ color: 0x00ff00 });
+      const cube = new THREE.Mesh(geometry2, material2);
+      cube.position.set(3, 2, 3);
+      cube.castShadow = true;
+      scene.add(cube);
+
+      //   平面---------------------
+      var planeGeometry = new THREE.PlaneGeometry(100, 100, 1, 1);
+      var planeMaterial = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+      var plane = new THREE.Mesh(planeGeometry, planeMaterial);
+      // 设置投影
+      plane.receiveShadow = true;
+      plane.rotation.x = -0.5 * Math.PI;
+      //   plane.position.x = 15;
+      //   plane.position.y = 0;
+      //   plane.position.z = 0;
+      scene.add(plane);
+
+      // 使用纹理加载器加载雪花图片
+      const texture = new THREE.TextureLoader().load("./img/shit.png");
+      // 精灵材质
+      const spriteMaterial = new THREE.SpriteMaterial({
+        map: texture,
+      });
+      const group = new THREE.Group();
+      // 循环创建精灵，并利用随机函数来设置每个精灵x、y、z的位置
+      for (let i = 0; i < 20000; i++) {
+        // 精灵
+        const sprite = new THREE.Sprite(spriteMaterial);
+        // 添加到组
+        group.add(sprite);
+        // 设置精灵缩放比例
+        sprite.scale.set(1, 1, 1);
+        // 设置精灵模型位置，在长方体空间上随机分布
+        const x = 200 * (Math.random() - 0.5);
+        const y = 200 * Math.random();
+        const z = 200 * (Math.random() - 0.5);
+        sprite.position.set(x, y, z);
+      }
+      scene.add(group);
+
+      // 周期性改变雪花Sprite位置
+      function snowLoop() {
+        group.children.forEach((sprite) => {
+          // 雪花的y坐标每次减1
+          sprite.position.y -= 0.2;
+          if (sprite.position.y < 0) {
+            // 如果雪花落到地面，重置y，重新下落
+            sprite.position.y = 200;
+          }
+        });
+        requestAnimationFrame(snowLoop);
+      }
+      //调用函数
+      snowLoop();
+
+      let mod7 = null;
+      loader.load("model/mod7/scene.gltf", function (gltf) {
+        mod7 = gltf.scene;
+        if (mod7) {
+          mod7.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+        }
+        // mod7.rotation.x = Math.PI / 4;
+        mixer4 = new THREE.AnimationMixer(gltf.scene);
+        const action4 = mixer4.clipAction(gltf.animations[0]);
+        action4.play();
+        // mod7.rotation.y = 10;
+        scene.add(mod7);
+      });
+
+      let curve = null;
+      let progress = 0; // 物体运动时在运动路径的初始位置，范围0~1
+      const velocity = 0.001; // 影响运动速率的一个值，范围0~1，需要和渲染频率结合计算才能得到真正的速率
+      function makeCurve() {
+        //Create a closed wavey loop
+        curve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, 2, 0),
+          new THREE.Vector3(-15, 2, 0),
+          new THREE.Vector3(0, 2, -15),
+        ]);
+        curve.curveType = "catmullrom";
+        curve.closed = true; //设置是否闭环
+        curve.tension = 1; // 设置线的张力，0为无弧度折线
+
+        // 为曲线添加材质在场景中显示出来，不显示也不会影响运动轨迹，相当于一个Helper
+        const points = curve.getPoints(50);
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const material = new THREE.LineBasicMaterial({ color: 0x000000 });
+
+        // Create the final object to add to the scene
+        const curveObject = new THREE.Line(geometry, material);
+        scene.add(curveObject);
+      }
+      makeCurve();
+
+      //让模型沿着运动轨迹移动
+      function moveOnCurve() {
+        if (curve == null || mod7 == null) {
+          console.log("Loading");
+        } else {
+          if (progress <= 1 - velocity) {
+            const point = curve.getPointAt(progress); //获取样条曲线指定点坐标
+            const pointBox = curve.getPointAt(progress + velocity); //获取样条曲线指定点坐标
+            mod7.lookAt(pointBox.x, pointBox.y, pointBox.z);
+            if (point && pointBox) {
+              mod7.position.set(point.x, point.y, point.z);
+              //   mod7.lookAt(pointBox.x, pointBox.y, pointBox.z); //因为这个模型加载进来默认面部是正对Z轴负方向的，所以直接lookAt会导致出现倒着跑的现象，这里用重新设置朝向的方法来解决。
+
+              var targetPos = pointBox; //目标位置点
+              var offsetAngle = 0; //目标移动时的朝向偏移
+
+              // //以下代码在多段路径时可重复执行
+              var mtx = new THREE.Matrix4(); //创建一个4维矩阵
+              // .lookAt ( eye : Vector3, target : Vector3, up : Vector3 ) : this,构造一个旋转矩阵，从eye 指向 target，由向量 up 定向。
+              mtx.lookAt(mod7.position, targetPos, mod7.up); //设置朝向
+              //   mod7.lookAt(pointBox.x, pointBox.y, pointBox.z);
+              mtx.multiply(
+                new THREE.Matrix4().makeRotationFromEuler(
+                  new THREE.Euler(0, offsetAngle, 0)
+                )
+              );
+              var toRot = new THREE.Quaternion().setFromRotationMatrix(mtx); //计算出需要进行旋转的四元数值
+              mod7.quaternion.slerp(toRot, 0);
+            }
+
+            progress += velocity;
+          } else {
+            progress = 0;
+          }
+        }
+      }
+
+      const particlesGeometry = new THREE.SphereGeometry(5, 50, 50);
+      const particlesMaterial = new THREE.PointsMaterial({
+        //点的大小
+        size: 0.1,
+        //开启尺寸衰减，当相机靠近时粒子变大，当相机远离时粒子变小
+        sizeAttenuation: true,
+      });
+      const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+      particles.position.set(0, 10, 0);
+      scene.add(particles);
+
+      addmod(mod1, "model/mod1/scene.gltf", 2, 1, 1, 0, -2);
+      addmod(mod2, "model/mod2/scene.gltf", -2, 0, 2, 0, -2);
+      addmod(mod4, "model/mod4/scene.gltf", -5, 0.6, 5, 0, 0);
+      addmod(mod5, "model/mod5/scene.gltf", -5, -0.1, -5, 0, 0);
+      addmod(mod6, "model/mod6/scene.gltf", 3, 3, -5, 0, -2);
+      createHelper();
+      controlsCreate();
+      animate();
+    </script>
+  </body>
+</html>

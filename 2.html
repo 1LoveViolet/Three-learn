@@ -185,9 +185,12 @@
       }
 
       var spotLight1 = new THREE.SpotLight(0xffffff);
-      spotLight1.position.set(0, 20, 0);
+      spotLight1.position.set(20, 20, 0);
       spotLight1.intensity = 500;
       spotLight1.castShadow = true;
+      spotLight1.shadow.mapSize.width = 4096;
+      spotLight1.shadow.mapSize.height = 4096;
+      console.log(spotLight1.shadow);
       scene.add(spotLight1);
       //   var spotLight2 = new THREE.SpotLight(0xffffff);
       //   spotLight2.position.set(-10, -5, -10);
@@ -355,6 +358,7 @@
 
       const particlesGeometry = new THREE.SphereGeometry(5, 50, 50);
       const particlesMaterial = new THREE.PointsMaterial({
+        map: texture,
         //点的大小
         size: 0.1,
         //开启尺寸衰减，当相机靠近时粒子变大，当相机远离时粒子变小

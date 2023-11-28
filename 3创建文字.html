@@ -30,6 +30,7 @@
       import { OrbitControls } from "three/addons/controls/OrbitControls.js";
       const gui = new dat.GUI();
       var renderer, scene, camera, controls;
+      var circle, cube;
       // 初始化场景
       function initScene() {
         scene = new THREE.Scene();
@@ -40,6 +41,7 @@
         // 给场景添加坐标轴
         var axes = new THREE.AxesHelper(100);
         initLight();
+        init();
         scene.add(axes);
       }
       // 初始化渲染器
@@ -84,15 +86,25 @@
         scene.add(pointLight);
       }
       var stats = new Stats();
+      const clock = new THREE.Clock();
       document.body.appendChild(stats.dom);
+
       function render() {
+        const elapsedTime = clock.getElapsedTime();
+        //update sphere animate
+        // 圆周运动
+        circle.position.x = Math.sin(elapsedTime) * 50;
+        circle.position.z = Math.cos(elapsedTime) * 50;
+        console.log(elapsedTime);
+        // 触底弹跳
+        // circle.position.y = Math.abs(Math.sin(elapsedTime * 3));
+
         renderer.render(scene, camera);
         controls.update();
         stats.update(); //更新性能插件
         requestAnimationFrame(render);
       }
-
-      function initText() {
+      function init() {
         // 初始化一个纹理加载器，然后用.load()加载纹理贴图
         const textureLoader = new THREE.TextureLoader();
         const colorTexture1 = textureLoader.load(
@@ -106,7 +118,7 @@
         const material3 = new THREE.MeshMatcapMaterial({
           matcap: colorTexture2,
         });
-        const circle = new THREE.Mesh(geometry, material3);
+        circle = new THREE.Mesh(geometry, material3);
         scene.add(circle);
         circle.position.set(0, 70, 0);
         colorTexture1.wrapS = THREE.RepeatWrapping;
@@ -115,20 +127,25 @@
         // 之后使用纹理来创建材质
         const material = new THREE.MeshBasicMaterial({ map: colorTexture1 });
         const geometry2 = new THREE.SphereGeometry(12, 100, 100);
-        const cube = new THREE.Mesh(geometry2, material);
+        cube = new THREE.Mesh(geometry2, material);
         cube.position.set(0, 30, 0);
         scene.add(cube);
+
         gsap.to(cube.rotation, {
           duration: 2,
           repeat: -1,
-          y: cube.rotation.y + Math.PI * 2,
+          yoyo: true,
+          y: Math.PI * 2,
         });
         gsap.to(circle.rotation, {
           duration: 2,
           repeat: -1,
-          x: circle.rotation.x + Math.PI * 2,
+          yoyo: true,
+          y: Math.PI * 2,
         });
+      }
 
+      function initText() {
         var loader = new FontLoader();
         loader.load(
           "./font/json/Microsoft YaHei_Regular.json",
@@ -238,6 +255,7 @@
         initControls();
         initLight();
         initText();
+        init();
         render();
       }
       start();

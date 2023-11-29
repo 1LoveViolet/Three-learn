@@ -80,15 +80,88 @@
       }
       var stats = new Stats();
       document.body.appendChild(stats.dom);
-
+      const clock = new THREE.Clock();
+      var Points, particlesGeometry;
       function render() {
         // 触底弹跳
         // circle.position.y = Math.abs(Math.sin(elapsedTime * 3));
+        const elapsedTime = clock.getElapsedTime();
+        //所有粒子作为一个整体绕Y轴旋转
+        // Points.rotation.y = elapsedTime * 0.2;
+        particlesGeometry.attributes.position.needsUpdate = true;
+        for (let i = 0; i < count; i++) {
+          // 顶点索引
+          const i3 = i * 3;
+          //i3+0便是每个顶点的x值，i3+1便是每个顶点的y值，i3+2便是每个顶点的z值
+          // particlesGeometry.attributes.position.array[i3 + 1] =
+          //   Math.sin(elapsedTime);
+          const x = particlesGeometry.attributes.position.array[i3 + 0];
+          particlesGeometry.attributes.position.array[i3 + 1] = Math.sin(
+            elapsedTime + x
+          );
+        }
 
         renderer.render(scene, camera);
         controls.update();
         stats.update(); //更新性能插件
         requestAnimationFrame(render);
+      }
+      const count = 10000;
+      function init() {
+        // const particles = new THREE.Points(
+        //   new THREE.SphereGeometry(1, 32, 32),
+        //   new THREE.PointsMaterial({
+        //     //点的大小
+        //     size: 0.02,
+        //     //开启尺寸衰减，当相机靠近时粒子变大，当相机远离时粒子变小
+        //     sizeAttenuation: true,
+        //   })
+        // );
+        // scene.add(particles);
+
+        particlesGeometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(count * 3);
+        const colors = new Float32Array(count * 3);
+        for (let i = 0; i < count * 3; i++) {
+          positions[i] = (Math.random() - 0.5) * 10;
+          colors[i] = Math.random();
+        }
+        particlesGeometry.setAttribute(
+          "position",
+          new THREE.BufferAttribute(positions, 3)
+        );
+        particlesGeometry.setAttribute(
+          "color",
+          new THREE.BufferAttribute(colors, 3)
+        );
+
+        //给粒子添加纹理
+        const textureLoader = new THREE.TextureLoader();
+        const particleTexture = textureLoader.load(
+          "./texture/PNG (Transparent)/circle_02.png"
+        );
+        const material = new THREE.PointsMaterial({
+          size: 0.2,
+          //开启尺寸衰减，当相机靠近时粒子变大，当相机远离时粒子变小
+          sizeAttenuation: true,
+          // map: particleTexture,
+          transparent: true,
+          alphaMap: particleTexture,
+          // alphaTest: 0.001,
+          // depthTest: false, //深度测试，
+          depthWrite: false,
+          // blending: THREE.AdditiveBlending,
+          vertexColors: true,
+        });
+        //创建
+        Points = new THREE.Points(particlesGeometry, material);
+
+        const geometry2 = new THREE.BoxGeometry(2, 2, 2);
+        const material2 = new THREE.MeshLambertMaterial({ color: 0x000000 });
+        const cube = new THREE.Mesh(geometry2, material2);
+        cube.position.set(3, 2, 3);
+        scene.add(cube);
+        scene.add(Points);
       }
 
       function start() {
@@ -97,6 +170,7 @@
         initCamera();
         initControls();
         initLight();
+        init();
         render();
       }
       start();

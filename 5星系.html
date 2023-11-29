@@ -84,7 +84,6 @@
       function render() {
         // 触底弹跳
         // circle.position.y = Math.abs(Math.sin(elapsedTime * 3));
-
         renderer.render(scene, camera);
         controls.update();
         stats.update(); //更新性能插件
@@ -92,7 +91,7 @@
       }
 
       const parameters = {
-        count: 10000,
+        count: 20000,
         size: 0.01,
         radius: 5,
         branches: 3,
@@ -178,13 +177,20 @@
          * Points
          */
         points = new THREE.Points(geometry, material);
+        points.rotation.set(0.2, 0, 0.2);
+        gsap.to(points.rotation, {
+          duration: 60,
+          repeat: -1,
+          ease: "none",
+          y: Math.PI * 2,
+        });
         scene.add(points);
       };
       function addGui() {
         gui
           .add(parameters, "count")
-          .min(10000)
-          .max(50000)
+          .min(20000)
+          .max(100000)
           .step(100)
           .name("粒子总数")
           .onFinishChange(init);

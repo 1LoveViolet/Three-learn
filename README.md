@@ -296,3 +296,130 @@ directionalLight.shadow.radius = 10
 
 ## 粒子
 
+粒子。它们非常受欢迎，可用于实现各种效果，如星星、烟、雨、灰尘、火和许多其他东西。
+粒子的好处是您可以在屏幕上以合理的帧速率显示数十万个粒子。缺点是每个粒子都由一个始终面向相机的平面（两个三角形）组成。
+创建粒子就像制作网格一样简单。我们需要一个BufferGeometry，一种可以处理粒子的材质 ( PointsMaterial )，而不是生成一个Mesh，我们需要创建一个Points。
+
+### BufferGeometry
+
+是面片、线或点几何体的有效表述。包括顶点位置，面片索引、法相量、颜色值、UV 坐标和自定义缓存属性值。使用 BufferGeometry 可以有效减少向 GPU 传输上述数据所需的开销。
+
+BufferGeometry是一个没有任何形状的空几何体，我们可以通过BufferGeometry自定义任何几何形状，具体一点说就是**定义顶点数据**。
+
+自定义buffergeometry几何体
+
+```
+particlesGeometry = new THREE.BufferGeometry();
+```
+
+通过JS类型化数组**Float32Array**创建一组xyz坐标数据用来表示几何体的顶点坐标和顶点颜色。
+
+```
+const positions = new Float32Array(count * 3);
+const colors = new Float32Array(count * 3);
+```
+
+通过一定算法，循环向数组注入数据，表示坐标和颜色，每三个数据作为一个坐标或rgb，count是粒子数量
+
+通过three.js的属性缓冲区对象 **BufferAttribute** 表示[threejs](https://so.csdn.net/so/search?q=threejs&spm=1001.2101.3001.7020)几何体顶点数据。
+
+```
+geometry.setAttribute("position",new THREE.BufferAttribute(positions, 3) );
+geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+```
+
+再通过new THREE.PointsMaterial设置粒子材质
+
+最后通过new THREE.Points(geometry, material); 创建粒子
+
+## 光线投射
+
+***光线投射([RayCaster](https://threejs.org/docs/index.html?q=Ra#api/zh/core/Raycaster))可以向特定方向投射光线，并测试哪些对象与其相交。光线投射用于进行鼠标拾取（在三维空间中计算出鼠标移过了什么物体）。***
+
+用法示例：
+
+1. 测试相机前方是否有一堵墙（障碍）
+2. 光线是否击中目标
+3. 当鼠标移动时测试是否有物体位于光标下方，以此模拟鼠标事件
+4. 当物体朝向特定某处时提示信息
+
+**创建光线投射**
+
+```
+const raycaster = new THREE.Raycaster()
+```
+
+```
+Raycaster( origin : Vector3, direction : Vector3, near : Float, far : Float )
+origin —— 光线投射的原点向量。
+direction —— 向射线提供方向的方向向量，应当被标准化（单位向量化.normalize()）。
+near —— 返回的所有结果比near远。near不能为负值，其默认值为0。
+far —— 返回的所有结果都比far近。far不能小于near，其默认值为Infinity（正无穷）
+```
+
+**设置射线原点和方向向量**
+
+```
+// 射线原点
+const rayOrigin = new THREE.Vector3(-3,0,0)
+//射线方向
+const rayDirection = new THREE.Vector3(10,0,0)
+// 必须将射线方向三维向量转化为单位向量
+// 也就是说，将该向量的方向设置为和原向量相同，但是其长度（length）为1
+rayDirection.normalize()
+raycaster.set(rayOrigin,rayDirection)
+```
+
+**投射射线**
+
+使用Raycaster的`intersectObject()`方法来测试一个对象，`intersectObjects()`方法测试一组对象
+
+```
+const intersect = raycaster.intersectObject(object2);
+const intersects = raycaster.intersectObjects([object1,object2,object3,]);
+```
+
+始终使用数组，即便你只是在测试一个对象，因为光线可以多次穿过同一对象
+
+查看打印结果对象包含了什么信息
+`distance` – 光线原点与碰撞点之间的距离
+`face` – 几何体的哪个面被光线击中
+`faceIndex` – 那被击中的面的索引
+`object` – 什么物体与碰撞有关
+`point` – 碰撞准确位置的矢量
+`uv` – 该几何体中的UV坐标
+
+### setFromCamera方法
+
+这个方法可以通过相机来设置origin,direction两个值，来设置射线的起点和方向
+
+```
+setFromCamera: function ( coords, camera )
+//coords: 鼠标的位置，是一个归一化的设备坐标，必须在-1到1之间
+//camera：光线起源的位置
+```
+
+### 归一化坐标
+
+- 归一化坐标优点：我们摄像机使用的是三维世界的世界坐标，通过归一化坐标比较好转化。
+- 假设我们三维世界中归一化坐标在原点，那我们屏幕坐标在左上角，所以需要通过转化函数，把屏幕坐标转化为归一化坐标
+
+简单来说就是原来的屏幕坐标原点为屏幕左上角，要转化为三维世界的原点位置，且坐标范围在[-1,1]
+
+```
+const sizes = {width: window.innerWidth,height: window.innerHeight,};
+mouse = new THREE.Vector2();
+window.addEventListener("mousemove", (_event) => {
+   mouse.x = (_event.clientX / sizes.width) * 2 - 1;
+   mouse.y = -(_event.clientY / sizes.height) * 2 + 1;
+});
+```
+
+_event.client为鼠标当前位置，_event.clientX / sizes.width是占屏幕的百分比，*2-1可以使得坐标范围在[-1,1]
+
+再通过**setFromCamera**方法来设置射线位置
+
+```
+raycaster.setFromCamera(mouse, camera);
+```
+

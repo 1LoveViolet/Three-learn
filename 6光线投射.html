@@ -82,7 +82,7 @@
         // light.position.set(1, 1, 1).normalize();
         // scene.add(light);
 
-        const light = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
+        const light = new THREE.HemisphereLight(0xffffbb, 0x080820, 1.5);
         scene.add(light);
       }
       var stats = new Stats();
@@ -126,7 +126,7 @@
             INTERSECTED.currentHex = INTERSECTED.material.color.getHex();
             // console.log(INTERSECTED.currentHex);
             // 设置当前选中的物体颜色为红色
-            INTERSECTED.material.color.setHex(0x0000ff);
+            INTERSECTED.material.color.setHex(0xff0000);
           }
           // 如果没有相交的物体，把选中的物体设置为原来的颜色
         } else {

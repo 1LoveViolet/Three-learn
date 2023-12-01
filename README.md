@@ -423,3 +423,51 @@ _event.client为鼠标当前位置，_event.clientX / sizes.width是占屏幕的
 raycaster.setFromCamera(mouse, camera);
 ```
 
+## 中国地图
+
+### 获取地图geoJson数据
+
+对于地图的获取我们可以通过[阿里云可视化平台](https://link.juejin.cn/?target=http%3A%2F%2Fdatav.aliyun.com%2Fportal%2Fschool%2Fatlas%2Farea_selector%23%26lat%3D31.769817845138945%26lng%3D104.29901249999999%26zoom%3D4)获取,这里我们自己封装一个方法网络请求获取
+
+```
+const getGeoJson = async (adcode, isFull = true) => {
+  const response = await fetch(
+    `https://geo.datav.aliyun.com/areas_v3/bound/geojson?code=${adcode}${
+      isFull ? "_full" : ""
+    }`,
+    {
+      method: "GET",
+    }
+  );
+
+  return response.json();
+};
+```
+
+### 数据处理步骤
+
+1.获取所绘制地图的最大和最小经纬度信息（地图的四边）
+
+2.根据地图的四边计算地图的中心点坐标，目的是方便后期经纬度转墨卡托使用，以及将整个地图移动到场景中心
+
+>这里解释下为什么要将地图移动到场景中心：我们绘制的地图的经纬度信息可能不是围绕场景中心的，这就导致地图可能距离中心很遥远，当我们相机设置的位置不是很合理的情况下，我们可能会发现绘制完成后根本看不到绘制的内容，这并不是我们想要的结果。
+
+3.处理经纬度信息，将经纬度坐标转化为[墨卡托投影](https://link.juejin.cn?target=)坐标。众所周知，地球是一个球体，每一个经纬度坐标并不在同一平面上，而我们在绘制`3d`地图的时候是将他们放在同一个平面上的，因此`geoJson`得到的经纬度信息我们无法直接使用，为此我们需要使用墨卡托投影对经纬度信息进行处理，使得他们能够在同一平面展示
+
+### 步骤的代码实现
+
+1.定义一个变量`mapSideInfo`用于存储所绘制地图的最大、最小经纬度信息；`centerPos`用于存储中心点坐标信息
+
+```
+// 用于计算整个图形的中心位置
+const mapSideInfo = {
+  minlon: Infinity,
+  maxlon: -Infinity,
+  minlat: Infinity,
+  maxlat: -Infinity,
+};
+
+// 中心坐标，用于到时候将图形绘制到坐标系原点计算使用
+let centerPos = {};
+```
+

@@ -201,8 +201,9 @@
         }
       }
       function cube() {
+        let cubeArr = [];
         meshArr.forEach((item, index) => {
-          let geometry = new THREE.SphereGeometry(0.3, 32, 16);
+          let geometry = new THREE.SphereGeometry(0.1, 32, 16);
           let material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
           let sphere = new THREE.Mesh(geometry, material);
           if (item.center != null) {
@@ -215,9 +216,10 @@
               -item.center[1],
               1
             );
-            scene.add(sphere);
+            cubeArr.push(sphere);
           }
         });
+        return cubeArr;
       }
 
       // 用于计算整个图形的中心位置
@@ -235,6 +237,7 @@
       var featuresArr, provinceJson;
       var meshArr = [],
         lineArr = [],
+        cubeArr = [],
         mesh;
       var upz = 2;
 
@@ -247,6 +250,7 @@
             if (meshArr.length != 0 && lineArr.length != 0) {
               scene.remove(...meshArr);
               scene.remove(...lineArr);
+              scene.remove(...cubeArr);
               console.log("remove后的数据： ", meshArr);
             }
             geoJson = response.data;
@@ -256,6 +260,7 @@
             calcSide(geoJson);
             meshArr = drawMap(geoJson);
             lineArr = drawLine(geoJson);
+            cubeArr = cube();
             console.log(meshArr);
             console.log(lineArr);
             console.log(scene);
@@ -263,7 +268,7 @@
             // scene.add(...meshArr);
             scene.add(...meshArr);
             scene.add(...lineArr);
-            if (meshArr.length) cube(meshArr);
+            scene.add(...cubeArr);
             // if (upz) {
             //   console.log(upz);
             //   meshArr.map((item) => {

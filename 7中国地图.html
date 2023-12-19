@@ -89,7 +89,7 @@
           1000
         );
         // camera.position.y = 0;
-        camera.position.set(0, -150, 150);
+        camera.position.set(0, -100, 100);
         camera.lookAt(v);
 
         // camera.position.z = 220;
@@ -110,23 +110,40 @@
       // 初始化光源
       function initLight() {
         // 白光，光强1
-        // pointLight = new THREE.PointLight(0xffffff, 10000);
-        // pointLight.position.set(0, 0, 80);
+        // pointLight = new THREE.PointLight(0xffffff, 100);
+        // pointLight.position.set(0, 20, 30);
         // scene.add(pointLight);
-        const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1);
-        const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1);
-        const directionalLight3 = new THREE.DirectionalLight(0xffffff, 1);
-        directionalLight2.position.set(0, -1, 0);
-        directionalLight3.position.set(0, 0, 1);
-        scene.add(directionalLight1);
+        // const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1);
+        // const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1);
+        // const directionalLight3 = new THREE.DirectionalLight(0xffffff, 1);
+        // directionalLight2.position.set(0, -1, 0);
+        // directionalLight3.position.set(0, 0, 1);
+        // scene.add(directionalLight1);
+        // scene.add(directionalLight2);
+        // scene.add(directionalLight3);
+        const ambientLight = new THREE.AmbientLight(0xd4e7fd, 4);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xe8eaeb, 0.2);
+        directionalLight.position.set(0, 10, 5);
+        const directionalLight2 = directionalLight.clone();
+        directionalLight2.position.set(0, 10, -5);
+        const directionalLight3 = directionalLight.clone();
+        directionalLight3.position.set(5, 10, 0);
+        const directionalLight4 = directionalLight.clone();
+        directionalLight4.position.set(-5, 10, 0);
+        scene.add(directionalLight);
         scene.add(directionalLight2);
         scene.add(directionalLight3);
+        scene.add(directionalLight4);
       }
       var stats = new Stats();
       document.body.appendChild(stats.dom);
 
       function render() {
         onRay();
+        renderCircle();
+        renderLine();
+        // arclineAnimate();
         renderer.render(scene, camera);
         controls.update();
         stats.update(); //更新性能插件
@@ -200,12 +217,36 @@
           // getGeoJson(100000);
         }
       }
+
+      function renderCircle() {
+        circleYs.forEach(function (mesh) {
+          // 目标 圆环放大 并 透明
+          mesh._s += 0.01;
+          mesh.scale.set(2 * mesh._s, 2 * mesh._s, 2 * mesh._s);
+          if (mesh._s <= 2) {
+            mesh.material.opacity = 2 - mesh._s;
+          } else {
+            mesh._s = 1;
+          }
+        });
+      }
+
+      const circleYs = [];
       function cube() {
         let cubeArr = [];
         meshArr.forEach((item, index) => {
           let geometry = new THREE.SphereGeometry(0.1, 32, 16);
           let material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
           let sphere = new THREE.Mesh(geometry, material);
+          // 圆环
+          const geometry2 = new THREE.RingGeometry(0.1, 0.11, 50);
+          // transparent 设置 true 开启透明
+          const material2 = new THREE.MeshBasicMaterial({
+            color: 0xff0000,
+            // side: THREE.DoubleSide,
+            transparent: true,
+          });
+          const circleY = new THREE.Mesh(geometry2, material2);
           if (item.center != null) {
             // item.geometry.computeBoundingSphere();
             // console.log(item.center[0], item.center[1]);
@@ -214,12 +255,182 @@
               // item.geometry.boundingSphere.center.y,
               item.center[0],
               -item.center[1],
-              1
+              extrudeSettings.depth / 4
+            );
+            circleY.position.set(
+              item.center[0],
+              -item.center[1],
+              extrudeSettings.depth / 4
             );
             cubeArr.push(sphere);
+            scene.add(circleY);
+            circleYs.push(circleY);
           }
         });
         return cubeArr;
+      }
+
+      var line;
+      function flyLine(meshArr) {
+        console.log(meshArr[0].center);
+        let first = meshArr[0].center;
+        let flyLineArr = [];
+        meshArr.forEach((item, index) => {
+          if (item.center != null && index != 0) {
+            const curve = new THREE.QuadraticBezierCurve3(
+              new THREE.Vector3(first[0], -first[1], extrudeSettings.depth / 4),
+              new THREE.Vector3(
+                (first[0] + item.center[0]) / 2,
+                -(first[1] + item.center[1]) / 2,
+                extrudeSettings.depth * 5
+              ),
+              new THREE.Vector3(
+                item.center[0],
+                -item.center[1],
+                extrudeSettings.depth / 4
+              )
+            );
+            // console.log(curve);
+            const points = curve.getPoints(50);
+            moveLine(curve);
+            const lineGeometry = new THREE.BufferGeometry().setFromPoints(
+              points
+            );
+            // line.geometry = lineGeometry;
+            // 获取曲线 上的50个点
+            var positions = [];
+            var colors = [];
+            var color = new THREE.Color();
+
+            // 给每个顶点设置演示 实现渐变
+            for (var j = 0; j < points.length; j++) {
+              color.setHSL(3 + j, 1, 0.5 + j * 0.0025); // 粉色
+              colors.push(color.r, color.g, color.b);
+              positions.push(points[j].x, points[j].y, points[j].z);
+            }
+            // 放入顶点 和 设置顶点颜色
+            // console.log(positions);
+            // console.log(colors);
+            lineGeometry.setAttribute(
+              "position",
+              new THREE.BufferAttribute(new Float32Array(positions), 3)
+            );
+            lineGeometry.setAttribute(
+              "color",
+              new THREE.BufferAttribute(new Float32Array(colors), 3)
+            );
+
+            const material = new THREE.LineBasicMaterial({
+              // vertexColors: THREE.VertexColors,
+              vertexColors: true,
+              linewidth: 5,
+              side: THREE.DoubleSide,
+              // color: "#FF7744",
+              // color: 0x2e91c2,
+            });
+            const flyline = new THREE.Line(lineGeometry, material);
+            flyLineArr.push(flyline);
+          }
+        });
+        return flyLineArr;
+      }
+      const moveSpots = [];
+      function moveLine(curve) {
+        // 线上的移动物体
+        const aGeo = new THREE.SphereGeometry(0.4, 0.4, 0.4);
+        const aMater = new THREE.MeshPhongMaterial({
+          color: 0xff0000,
+          side: THREE.DoubleSide,
+        });
+        const aMesh = new THREE.Mesh(aGeo, aMater);
+        // 保存曲线实例
+        aMesh.curve = curve;
+        aMesh._s = 0;
+        scene.add(aMesh);
+
+        moveSpots.push(aMesh);
+        // const lightGeometry = new THREE.BufferGeometry();
+        // const pots = curve.getPoints(50);
+        // var pointsV3 = [];
+        // for (var j = 0; j < pots.length; j++) {
+        //   // color.setHSL(0.81666 + j, 0.88, 0.715 + j * 0.0025); // 粉色
+        //   // colors.push(color.r, color.g, color.b);
+        //   pointsV3.push(pots[j].x, pots[j].y, pots[j].z);
+        // }
+        // lightGeometry.setAttribute(
+        //   "position",
+        //   new THREE.BufferAttribute(new Float32Array(pointsV3), 3)
+        // );
+        // const lightMaterial = new THREE.LineBasicMaterial({
+        //   transparent: true,
+        //   side: THREE.DoubleSide,
+        //   linewidth: 20,
+        //   depthTest: false, // 慎用
+        //   vertexColors: true,
+        // });
+        // // 渐变色处理
+        // const colorsArr = [];
+        // const c1 = new THREE.Color(0x00ffff);
+        // const c2 = new THREE.Color(0x224242);
+        // console.log(c1, c2);
+        // for (var j = 0; j < pots.length; j++) {
+        //   let chazhi1 = (c1.r - c2.r) / pots.length;
+        //   let chazhi2 = (c1.g - c2.g) / pots.length;
+        //   let chazhi3 = (c1.b - c2.b) / pots.length;
+        //   let r = c2.r + chazhi1;
+        //   let g = c2.g + chazhi2;
+        //   let b = c2.b + chazhi3;
+        //   colorsArr.push(r, g, b);
+        // }
+        // lightGeometry.setAttribute(
+        //   "color",
+        //   new THREE.BufferAttribute(new Float32Array(colorsArr), 3)
+        // );
+        // const lightLine = new THREE.Line(lightGeometry, lightMaterial);
+        // lightLine.computeLineDistances();
+        // lightLine.curve = curve;
+        // lightLine._s = 0;
+        // scene.add(lightLine);
+        // moveSpots.push(lightLine);
+      }
+
+      function renderLine() {
+        moveSpots.forEach(function (mesh) {
+          mesh._s += 0.006;
+          let tankPosition = new THREE.Vector3();
+          tankPosition = mesh.curve.getPointAt(mesh._s % 1);
+          mesh.position.set(tankPosition.x, tankPosition.y, tankPosition.z);
+        });
+      }
+
+      let timestamp = 0;
+      let colorIndex = 0;
+      // 线的动画
+      function arclineAnimate() {
+        console.log(line);
+        // if (line.geometry == undefined) {
+        //   return;
+        // }
+        let color = linegeometry.getAttribute("color");
+
+        let now = Date.now();
+        if (now - timestamp > 30) {
+          timestamp = now;
+          colorIndex++;
+          if (colorIndex >= color.count) {
+            colorIndex = 0;
+          }
+        }
+
+        for (let i = 0; i < color.array.length; i += 3) {
+          if (i / 3 === colorIndex) {
+            color.array[i + 2] = 1;
+          } else {
+            color.array[i + 2] = 0;
+          }
+        }
+
+        line.geometry.attributes.color.needsUpdate = true; // 更新颜色
       }
 
       // 用于计算整个图形的中心位置
@@ -239,6 +450,7 @@
         lineArr = [],
         cubeArr = [],
         mesh;
+      var flyLineArr = [];
       var upz = 2;
 
       const getGeoJson = async (adcode, upz) => {
@@ -251,6 +463,9 @@
               scene.remove(...meshArr);
               scene.remove(...lineArr);
               scene.remove(...cubeArr);
+              scene.remove(...circleYs);
+              scene.remove(...flyLineArr);
+              scene.remove(...moveSpots);
               console.log("remove后的数据： ", meshArr);
             }
             geoJson = response.data;
@@ -261,6 +476,8 @@
             meshArr = drawMap(geoJson);
             lineArr = drawLine(geoJson);
             cubeArr = cube();
+            flyLineArr = flyLine(meshArr);
+            flyLine(meshArr);
             console.log(meshArr);
             console.log(lineArr);
             console.log(scene);
@@ -269,6 +486,7 @@
             scene.add(...meshArr);
             scene.add(...lineArr);
             scene.add(...cubeArr);
+            scene.add(...flyLineArr);
             // if (upz) {
             //   console.log(upz);
             //   meshArr.map((item) => {
@@ -319,6 +537,7 @@
             break;
         }
       }
+
       var planewh = {
         width: 300,
         height: 300,
@@ -403,6 +622,7 @@
         });
         return shap;
       };
+
       const drawPoint = (lonlatArr) => {
         const pointsArray = new Array();
         lonlatArr.forEach((lonlat) => {
@@ -412,6 +632,7 @@
         });
         return pointsArray;
       };
+
       const addmesh = (lonlatArr) => {
         // console.log(lonlatArr);
         const shap = drawPlan(lonlatArr);
@@ -420,24 +641,32 @@
         geo.rotateX(Math.PI);
         // 材质
         const material = new THREE.MeshStandardMaterial({
-          color: randomColor(),
-          //   color: "#0000ff",
+          // color: randomColor(),
+          color: "#00BBFF",
+          emissive: 0x000000,
+          roughness: 0.45,
+          metalness: 0.8,
+          transparent: true,
+          opacity: 0.5,
+          side: THREE.DoubleSide,
         });
         // material.backup = material.color.getHex();
         // 物体
         const mesh = new THREE.Mesh(geo, material);
         return mesh;
       };
+
       const addLine = (lonlatArr) => {
         const lineGeometry = new THREE.BufferGeometry();
         const pointsArray = drawPoint(lonlatArr);
         lineGeometry.setFromPoints(pointsArray);
         const lineMaterial = new THREE.LineBasicMaterial({
-          color: "#000000",
+          color: "#ffffff",
         });
         let line = new THREE.Line(lineGeometry, lineMaterial);
         return line;
       };
+
       const randomColor = () =>
         `rgb(${Math.floor(Math.random() * 255)},${Math.floor(
           Math.random() * 255
@@ -455,6 +684,7 @@
         // bevelEnabled: false,
         // steps: 1,
       };
+
       const drawMap = (geoJson) => {
         // console.log(geoJson);
         const meshArray = [];
@@ -481,6 +711,7 @@
 
         return meshArray;
       };
+
       const drawLine = (geoJson) => {
         const lineArray = [];
         const { features } = geoJson;
@@ -527,27 +758,6 @@
           .step(1)
           .name("depth")
           .onFinishChange(getGeoJson);
-        // gui
-        //   .add(pointLight, "intensity")
-        //   .min(5000)
-        //   .max(50000)
-        //   .step(10)
-        //   .name("intensity");
-        //   .onFinishChange(getGeoJson);
-        // gui
-        //   .add(planewh, "width")
-        //   .min(100)
-        //   .max(1000)
-        //   .step(1)
-        //   .name("width")
-        //   .onFinishChange(createPlane);
-        // gui
-        //   .add(planewh, "height")
-        //   .min(100)
-        //   .max(1000)
-        //   .step(1)
-        //   .name("height")
-        //   .onFinishChange(createPlane);
       }
 
       function start() {

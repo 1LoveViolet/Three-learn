@@ -471,3 +471,439 @@ const mapSideInfo = {
 let centerPos = {};
 ```
 
+## Shader
+
+### Vertex Shader
+
+片元着色器
+
+````javascript
+const vertex = `
+  void main() {
+    // gl_Position = projectionMatrix * viewMatrix * modelMatrix * 	vec4(position, 1.0);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+````
+
+
+
+### Fragment Shader
+
+顶点着色器
+
+
+
+### 三种修饰符 attribute/uniform/varying
+
+attribute修饰符表示  这个数据 在每个顶点上都不同
+
+uniform修饰符表示  这个数据 在每个顶点上都相同
+
+varying修饰符是 顶点着色器 传递给 片元着色器 的数据
+
+![image-20240429144326210](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240429144326210.png)
+
+```
+      const vertex = `
+		varying vec2 vUv;
+		void main() {
+  			vUv = uv;
+  			gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+		}
+		`;
+      const fragment = `
+      	varying vec2 vUv;
+		void main() {
+  			gl_FragColor = vec4(1.0, vUv.x, vUv.y, 1.0);
+		}
+		`;
+```
+
+![image-20240429151602500](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240429151602500.png)
+
+rgba(红，绿，蓝，透明度)
+
+vec4(1.0, vUv.x, vUv.y, 1.0);  1.0表示全为红，vUv.x表示x轴方向绿色从0->1,vUv.y表示y轴方向蓝色从0->1
+
+GLSL内置函数**step(edge,x)**，如果 `x<edge` 返回0.0，如果 `x>edge` 返回1.0。**实现突变**
+
+````
+float color = step(0.5, vUv.x);
+gl_FragColor = vec4(vec3(color), 1.0);
+````
+
+![image-20240429161838743](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240429161838743.png)
+
+GLSL内置函数**fract( )**，fract函数的意思是取小数部分。使得数值在 0.0-1.0 里循环重复，比如1.1、2.1取小数后都变回0.1。**实现重复**
+
+````
+gl_FragColor = vec4(vec3(fract(vUv.x * 10.0)), 1.0);
+````
+
+
+
+![image-20240429161908477](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240429161908477.png)
+
+GLSL内置函数**length()**，获取向量的长度。
+
+````
+float dist = length(vUv);
+vec3 color = vec3(dist);
+gl_FragColor = vec4(color, 1.0);
+````
+
+vUv看作圆心出发的向量，长度为半径时值为1，（1，1，1，1.0）为白色。
+
+![image-20240429162211765](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240429162211765.png)
+
+内置函数mix(x,y,a)为线性插值，结果为 `x*(1-a)+y*a`，浮点数 a 的范围是0.0到1.0，根据其数值大小对 x、y 进行插值。
+
+````
+vec3 color1 = vec3(1.0, 1.0, 0.0);
+vec3 color2 = vec3(0.0, 1.0, 1.0); 
+float mixer = vUv.x;
+vec3 color = mix(color1, color2, mixer);
+gl_FragColor = vec4(color, 1.0);
+````
+
+![image-20240508143732749](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508143732749.png)
+
+color1为黄色，color2为青色，mixer为vUv.x  所以从黄色沿着x轴渐变为青色
+
+````
+  vec3 color1 = vec3(1.0, 1.0, 0.0);
+  vec3 color2 = vec3(0.0, 1.0, 1.0); 
+  float mixer = fract(vUv.x*4.0);
+  vec3 color = mix(color1, color2, mixer);
+  gl_FragColor = vec4(color, 1.0);
+````
+
+![image-20240508143940912](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508143940912.png)
+
+对角渐变，mixer=（vUv.x+vUv.y）/2
+
+![image-20240508144501394](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508144501394.png)
+
+两个对角向中心渐变
+
+````
+float mixer1 = vUv.x + vUv.y;
+float mixer2 = 2.0 - (vUv.x + vUv.y);
+float mixer = mixer1 * mixer2;;
+````
+
+
+
+![image-20240508145734610](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508145734610.png)
+
+限制最大值后再相乘
+
+借助内置函数clamp(x,min,max),将x限制在min-max之间
+
+```
+float mixer1 = vUv.x + vUv.y;
+mixer1 = clamp(mixer1, 0.0, 1.0);
+float mixer2 = 2.0 - (vUv.x + vUv.y);
+mixer2 = clamp(mixer2, 0.0, 1.0);
+float mixer = mixer1 * mixer2;
+```
+
+![image-20240508150126103](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508150126103.png)
+
+### 黑白棋盘格
+
+将多行黑白突变与多行白黑突变相减再取绝对值
+
+```
+vec3 mask1 = vec3(step(0.5, fract(vUv.x * 3.0)));
+vec3 mask2 = vec3(step(0.5, fract(vUv.y * 3.0)));
+vec3 color = abs(mask1 - mask2);
+gl_FragColor = vec4(color, 1.0);
+```
+
+![image-20240508151014780](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508151014780.png)
+
+彩色棋盘格
+
+```
+  vec3 color1 = vec3(1.0, 0.0, 0.0);
+  vec3 color2 = vec3(0.0, 0.0, 0.0);
+  vec3 mask1 = vec3(step(0.5, fract(vUv.x * 3.0)));
+  vec3 mask2 = vec3(step(0.5, fract(vUv.y * 3.0)));
+  vec3 mixer = abs(mask1 - mask2);
+  vec3 color = mix(color1, color2, mixer);
+  gl_FragColor = vec4(color, 1.0);
+```
+
+![image-20240508151448425](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508151448425.png)
+
+abs+圆环
+
+使用distance()距离函数，相当于各点到(0.5,0.5)的距离。越近越黑
+
+```
+float strength = distance(vUv, vec2(0.5));
+vec3 color = vec3(strength);
+gl_FragColor = vec4(color, 1.0);
+```
+
+![image-20240508153325406](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508153325406.png)
+
+此时将strength加一个值，表示黑圆向外扩大，减去一个值，代表黑圆向内缩小
+
+如果strength减去一个值，再取绝对值，圆中心就会变白
+
+![image-20240508153746319](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508153746319.png)
+
+再使用step进行突变
+
+```
+float strength = abs(distance(vUv, vec2(0.5))-0.25);
+vec3 color = step(0.01,vec3(strength));
+gl_FragColor = vec4(color, 1.0);
+```
+
+![image-20240508153931508](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508153931508.png)
+
+```
+float strength = abs(distance(vUv, vec2(0.5))-0.25);
+vec3 color = 1.0-step(0.01,vec3(strength));
+gl_FragColor = vec4(color, 1.0);
+```
+
+![image-20240508154335653](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508154335653.png)
+
+对角线渐变用abs再次实现
+
+```
+float mixer = 1.0-abs((vUv.x + vUv.y - 1.0));
+vec3 color = vec3(mixer);
+gl_FragColor = vec4(color, 1.0);
+```
+
+![image-20240508155515360](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508155515360.png)
+
+### 通过顶点着色器改变球体的位置
+
+接下来介绍的 noise 噪声函数（Perlin Noise、Simplex Noise 等）可能有些人还没听说过，但其实用起来很简单，而且效果更强大。一言以蔽之借助 noise 函数能使相邻的点（一维、二维、三维的点都行）产生相近的数值，而不是 random 随机函数那种每个位置的数值都和附近无关的效果。
+
+引入现成的谷歌glsl noise function
+
+直接添加到main()之前.将球体的定位位置position通过噪声函数处理后，为了使球体的变换都按照原来的方向变化，乘以他的方向单位向量normal。将normal值传递到片元着色器，改变颜色
+
+```
+float cnoise(vec3 P){
+  // ...
+}
+
+void main() {
+  vec3 newPos = position;
+  newPos += normal * cnoise(position);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
+  vNormal = normal;
+}
+```
+
+```
+varying vec3 vNormal;
+void main() {
+  gl_FragColor = vec4(vNormal, 1.0);
+}
+```
+
+![image-20240508163959295](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240508163959295.png)
+
+上面是使用cnoise函数，下面使用random函数来看效果
+
+```
+// 3D Randomness
+float random(vec3 pos){
+  return fract(sin(dot(pos, vec3(64.25375463, 23.27536534, 86.29678483))) * 59482.7542);
+}
+
+void main() {
+  vec3 newPos = position;
+  // newPos += normal * cnoise(position);
+  newPos += normal * random(position);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
+}
+```
+
+
+
+
+
+noise改变position相邻范围
+
+```
+  vec3 newPos = position;
+  newPos += normal * cnoise(position * (sin(uTime) ) * 4.0);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
+  vNormal = normal;
+```
+
+<video src="C:\Users\ouyang\AppData\Local\Packages\Microsoft.ScreenSketch_8wekyb3d8bbwe\TempState\Recordings\20240509-0140-55.4253238.mp4"></video>
+
+用noise数值mix颜色
+
+通过noise函数获取到颜色值后，通过step函数将数值变为0.0或者1.0
+
+```
+varying float vNoise;
+void main() {
+  vec3 newPos = position;
+  float noise = cnoise(position * (sin(uTime)+1.0 ) * 4.0);
+  noise = step(0.0, noise);
+  newPos += normal * noise * 0.0;
+  vNoise = noise;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
+}
+```
+
+```
+varying float vNoise;
+void main() {
+  vec3 color1 = rgb(255.0, 0.0, 0.0);
+  vec3 color2 = rgb(110., 161., 212.);
+  vec3 color = mix(color1, color2, vNoise);
+  gl_FragColor = vec4(color, 1.0);
+}
+```
+
+![image-20240509102041125](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240509102041125.png)
+
+再把noise偏移顶点加回去,并且使用HSL颜色。HSL 即色相 Hue、饱和度 Saturation、亮度 Lightness 的简称。
+
+将hsl颜色转化为rgb颜色      glsl hsl   或者glsl hs12rgb  函数
+
+```
+void main() {
+  vec3 newPos = position;
+  float noise = cnoise(position * (sin(uTime) +3.0) * 4.0);
+  newPos += normal * noise;
+  vNoise = noise;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
+}
+```
+
+```
+void main() {
+  vec3 color = hsl2rgb((0.1 + vNoise * 0.1), 1.0, 0.5);
+  gl_FragColor = vec4(color, 1.0);
+}
+```
+
+![image-20240509102003430](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240509102003430.png)
+
+### shader拧麻花
+
+先创造一个长方体，再通过fract和step设置条纹
+
+```
+vec3 color1 = vec3(0.847, 0.204, 0.373);
+vec3 color2 = vec3(1.0);
+float mixer = step(0.5, fract(vUv.y * 3.0));
+```
+
+![image-20240509150226313](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240509150226313.png)
+
+旋转顶点
+
+使用glsl rotate，让每个顶点都绕x轴旋转，即 axis 用 (1.0, 0.0, 0.0) 表示。
+
+再使旋转的角度随着X的值变化
+
+为了使旋转更加丝滑，需要增加长方体的细分数
+
+```
+const geometry = new THREE.BoxGeometry(3, 1, 1, 64, 64, 64);
+```
+
+```
+uniform float uTime;
+varying vec2 vUv;
+const float PI = 3.1415925;
+// vec3 rotate(...){ ... }
+void main() {
+  vUv = uv;
+  vec3 axis = vec3(1.0, 0.0, 0.0);
+  float angle = position.x;
+  vec3 newPos = rotate(position, axis, angle);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
+}
+```
+
+![image-20240509150610189](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240509150610189.png)
+
+给angle加上时间
+
+```
+float angle = position.x*sin(uTime);
+```
+
+<video src="C:\Users\ouyang\AppData\Local\Packages\Microsoft.ScreenSketch_8wekyb3d8bbwe\TempState\Recordings\20240509-0747-01.4994296.mp4"></video>
+
+### 最简单的粒子系统
+
+想在 Three.js 里实现粒子系统，最简单的就是用现成的几何体如 SphereGeometry 搭配 `PointsMaterial` 材质，再丢给 `Points` 来替代 Mesh，即可在几何体顶点处放置粒子，默认粒子为方形。其中在 PointsMaterial 里可以统一设置粒子的颜色和大小。
+
+```
+const geometry = new THREE.SphereGeometry(10);
+const material = new THREE.PointsMaterial({
+  size: 0.4,
+  color: 0xffffff,
+});
+
+const points = new THREE.Points(geometry, material);
+scene.add(points);
+```
+
+
+
+![image-20240509160005080](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240509160005080.png)
+
+不过使用 SphereGeometry 有个很大的问题，粒子在球体两极密集、中间分散，空间上分布不均匀。
+
+一种解决办法是用 `IcosahedronGeometry` 正二十面体，传入半径和细分数两个参数，细分数越大顶点越多，此时粒子分布很均匀。
+
+```
+const geometry = new THREE.IcosahedronGeometry(10, 6);
+```
+
+![image-20240509160114551](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240509160114551.png)
+
+材质换成 ShaderMaterial
+
+为了更灵活的控制粒子效果，可以把材质换成 ShaderMaterial，和此前系列文章里的 shader 不同之处在于这里可通过 `gl_PointSize` 另外设置粒子大小，如果用一个固定数值的话粒子都一样大。
+
+想要使靠近相机的粒子大、远离相机的粒子小，就需要对 mvPosition.z 值取倒数。经过 modelViewMatrix 后相机在原点处，3D物体顶点都在 z 轴负方向上，所以这里要加个负号，近大远小取倒数，再通过前面的数值调整大小即可。
+
+```C#
+gl_PointSize = 100.0 / -mvPosition.z;
+```
+
+![image-20240509161922088](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240509161922088.png)
+
+粒子系统看起来像由许多小 plane 组成，如果每个粒子有自己单独的 uv 坐标事情就好办了。
+
+先直接用 uv 作为颜色看看，此时 uv 还是几何体上面的坐标而不是每个粒子单独的。
+
+![image-20240509162041529](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240509162041529.png)
+
+幸运的是粒子系统里 `gl_PointCoord` 就是每个粒子上的(0,0)到(1,1)坐标，直接拿来替代 uv 就行，此时每个粒子上都是熟悉的青绿色。
+
+```C#
+gl_FragColor = vec4(gl_PointCoord, 0.0, 1.0);
+```
+
+![image-20240509162116218](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240509162116218.png)
+
+对 gl_PointCoord 减去0.5将坐标范围变化到(-0.5,-0.5)到(0.5,0.5)进行居中，接着通过 length 计算离粒子中心的距离，再通过 step 使得距离小于0.5半径的值为1.0，大于0.5的为0.0，然后作为颜色即可绘制出圆形，但此时粒子半径之外是黑色的而不是透明的，可以通过 discard 丢弃、不绘制对应片元/像素。
+
+![image-20240509164110602](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240509164110602.png)
+
+除了用 Three.js 现成的几何体外，我们还能通过 `BufferGeometry` 来自定义几何体的 position 顶点坐标，这样想在哪放粒子就能在哪放。
+
+在半径0-10、角度0-2xPI范围内随机出一个个顶点的 xy 坐标，将 z 统一设成0，依次放到数组里，再用 geometry.setAttribute 设置到顶点属性上，命名为 position，且通过 Float32BufferAttribute 表示该数组数据是三个为一组，组成 vec3，这样在顶点着色器里用 `attribute vec3 position` 就能声明和使用，只不过 ShaderMaterial 里 position 默认已经声明，所以直接用就行。
+

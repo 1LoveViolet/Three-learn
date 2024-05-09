@@ -9,6 +9,7 @@
         position: relative;
         /* background: url("./img/mapback.png") center no-repeat;
         background-size: cover; */
+        transition: all 0.3s;
       }
       #tooltip {
         position: absolute;
@@ -66,8 +67,8 @@
         // scene.background = new THREE.Color(0x111111);
         scene.fog = new THREE.Fog(0x000000, 0, 3000);
         // 给场景添加坐标轴
-        var axes = new THREE.AxesHelper(100);
-        scene.add(axes);
+        // var axes = new THREE.AxesHelper(100);
+        // scene.add(axes);
       }
       // 初始化渲染器
       function initRenderer() {
@@ -80,7 +81,7 @@
         document.body.appendChild(renderer.domElement);
       }
       // 初始化相机
-      let v = new THREE.Vector3(32.499207496643066, 38.21255111694336, 0);
+      var v = new THREE.Vector3(32.499207496643066, 38.21255111694336, 0);
       function initCamera() {
         camera = new THREE.PerspectiveCamera(
           45,
@@ -98,7 +99,7 @@
       function initControls() {
         controls = new OrbitControls(camera, renderer.domElement);
         // controls.target.set(32.499207496643066, 38.21255111694336, 0);
-        controls.target.set(0, 0, 0);
+        // controls.target.set(0, 0, 0);
         // 阻尼效果
         controls.enableDamping = true;
         // 摄像机自动旋转
@@ -121,20 +122,20 @@
         // scene.add(directionalLight1);
         // scene.add(directionalLight2);
         // scene.add(directionalLight3);
-        const ambientLight = new THREE.AmbientLight(0xd4e7fd, 4);
-        scene.add(ambientLight);
+        // const ambientLight = new THREE.AmbientLight(0xd4e7fd, 4);
+        // scene.add(ambientLight);
         const directionalLight = new THREE.DirectionalLight(0xe8eaeb, 0.2);
         directionalLight.position.set(0, 10, 5);
-        const directionalLight2 = directionalLight.clone();
-        directionalLight2.position.set(0, 10, -5);
-        const directionalLight3 = directionalLight.clone();
-        directionalLight3.position.set(5, 10, 0);
-        const directionalLight4 = directionalLight.clone();
-        directionalLight4.position.set(-5, 10, 0);
+        // const directionalLight2 = directionalLight.clone();
+        // directionalLight2.position.set(0, 10, -5);
+        // const directionalLight3 = directionalLight.clone();
+        // directionalLight3.position.set(5, 10, 0);
+        // const directionalLight4 = directionalLight.clone();
+        // directionalLight4.position.set(-5, 10, 0);
         scene.add(directionalLight);
-        scene.add(directionalLight2);
-        scene.add(directionalLight3);
-        scene.add(directionalLight4);
+        // scene.add(directionalLight2);
+        // scene.add(directionalLight3);
+        // scene.add(directionalLight4);
       }
       var stats = new Stats();
       document.body.appendChild(stats.dom);
@@ -142,7 +143,7 @@
       function render() {
         onRay();
         renderCircle();
-        renderLine();
+        renderLine(); //移动小球
         // arclineAnimate();
         renderer.render(scene, camera);
         controls.update();
@@ -207,11 +208,17 @@
         );
         // 被射线照射到的一组对象
         const intersects = raycaster.intersectObjects(mapChildren);
+        console.log("被射线照射到的一组对象", intersects);
+        console.log("被射线照射到的一组对象", intersects[0]);
         const tooltip = document.getElementById("tooltip");
-        if (intersects.length > 0) {
+        if (intersects[0]) {
           console.log(intersects[0]);
           upz = upz * 2;
           getprovinceJson(intersects[0].object);
+          cameraLookAt(
+            intersects[0].object.center[0],
+            intersects[0].object.center[1]
+          );
         } else {
           console.log("没有选中");
           // getGeoJson(100000);
@@ -255,13 +262,9 @@
               // item.geometry.boundingSphere.center.y,
               item.center[0],
               -item.center[1],
-              extrudeSettings.depth / 4
+              0.2
             );
-            circleY.position.set(
-              item.center[0],
-              -item.center[1],
-              extrudeSettings.depth / 4
-            );
+            circleY.position.set(item.center[0], -item.center[1], 0.2);
             cubeArr.push(sphere);
             scene.add(circleY);
             circleYs.push(circleY);
@@ -278,17 +281,13 @@
         meshArr.forEach((item, index) => {
           if (item.center != null && index != 0) {
             const curve = new THREE.QuadraticBezierCurve3(
-              new THREE.Vector3(first[0], -first[1], extrudeSettings.depth / 4),
+              new THREE.Vector3(first[0], -first[1], 0.2),
               new THREE.Vector3(
                 (first[0] + item.center[0]) / 2,
                 -(first[1] + item.center[1]) / 2,
-                extrudeSettings.depth * 5
+                10
               ),
-              new THREE.Vector3(
-                item.center[0],
-                -item.center[1],
-                extrudeSettings.depth / 4
-              )
+              new THREE.Vector3(item.center[0], -item.center[1], 0.2)
             );
             // console.log(curve);
             const points = curve.getPoints(50);
@@ -337,8 +336,9 @@
       const moveSpots = [];
       function moveLine(curve) {
         // 线上的移动物体
+        //圆球
         const aGeo = new THREE.SphereGeometry(0.2, 50, 50);
-        const aMater = new THREE.MeshPhongMaterial({
+        const aMater = new THREE.MeshBasicMaterial({
           color: 0xff0000,
           side: THREE.DoubleSide,
         });
@@ -471,10 +471,13 @@
             geoJson = response.data;
             featuresArr = geoJson.features;
             console.log(geoJson);
-            selectedScaleDown(geoJson);
+
+            // selectedScaleDown(geoJson);
             calcSide(geoJson);
+            fn(geoJson);
             meshArr = drawMap(geoJson);
             lineArr = drawLine(geoJson);
+
             cubeArr = cube();
             flyLineArr = flyLine(meshArr);
             flyLine(meshArr);
@@ -517,6 +520,14 @@
       };
       getGeoJson(100000);
 
+      function fn(geoJson) {
+        //原理：使用静态成员
+        if (!fn.flag) {
+          drawBasicLine(geoJson);
+          fn.flag = 1;
+        }
+      }
+
       function getprovinceJson(item) {
         console.log(item.adcode);
         getGeoJson(item.adcode, upz);
@@ -558,7 +569,7 @@
           color: 0xffffff,
         });
         var plane = new THREE.Mesh(planeGeometry, planeMaterial);
-        plane.position.z = -10;
+        plane.position.z = -3;
         scene.add(plane);
       }
 
@@ -660,10 +671,10 @@
         const lineGeometry = new THREE.BufferGeometry();
         const pointsArray = drawPoint(lonlatArr);
         lineGeometry.setFromPoints(pointsArray);
-        const lineMaterial = new THREE.LineBasicMaterial({
+        const lineMaterial1 = new THREE.LineBasicMaterial({
           color: "#ffffff",
         });
-        let line = new THREE.Line(lineGeometry, lineMaterial);
+        let line = new THREE.Line(lineGeometry, lineMaterial1);
         return line;
       };
 
@@ -673,7 +684,7 @@
         )},${Math.floor(Math.random() * 255)})`;
 
       const extrudeSettings = {
-        steps: 10, //用于沿着挤出样条的深度细分的点的数量，默认值为1。
+        steps: 1, //用于沿着挤出样条的深度细分的点的数量，默认值为1。
         depth: 3, //挤出的形状的深度，默认值为1。
         bevelEnabled: true, //对挤出的形状应用是否斜角，默认值为true。
         bevelThickness: 0.2, //设置原始形状上斜角的厚度。默认值为0.2。
@@ -712,12 +723,40 @@
         return meshArray;
       };
 
+      let once = function (fn) {
+        let caller = true;
+        return function () {
+          if (caller) {
+            caller = false;
+            fn.apply(this, arguments);
+          }
+        };
+      };
+
+      const drawBasicLine = (geoJson) => {
+        const { features } = geoJson;
+        features.forEach((feature) => {
+          dealWithCoord(feature.geometry, (lonlatArr) => {
+            let line2 = addLine(lonlatArr);
+            // console.log(line2);
+            line2.material.color.r = 0;
+            line2.material.color.g = 0;
+            line2.material.color.b = 0;
+            line2.position.z = -3;
+            scene.add(line2);
+          });
+        });
+      };
+
       const drawLine = (geoJson) => {
         const lineArray = [];
         const { features } = geoJson;
         features.forEach((feature) => {
           dealWithCoord(feature.geometry, (lonlatArr) => {
             let line = addLine(lonlatArr);
+            // let line2 = addLine(lonlatArr);
+            // line2.position.set(0, 0, -3);
+            // scene.add(line2);
             // line.position.set(0, 9, 0);
             lineArray.push(line);
           });
@@ -743,6 +782,14 @@
         });
       };
 
+      function cameraLookAt(x, y) {
+        controls.target.set(x, -y, 0);
+        v = new THREE.Vector3(x, -y, 0);
+        // camera.position.y = 0;
+        camera.position.set(x, -y - 30, 40);
+        camera.lookAt(v);
+      }
+
       function addGui() {
         gui
           .add(extrudeSettings, "steps")
@@ -766,7 +813,7 @@
         initCamera();
         initControls();
         initLight();
-        addGui();
+        // addGui();
         getSelMap();
         createPlane();
         // mousemove();

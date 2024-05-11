@@ -907,3 +907,353 @@ gl_FragColor = vec4(gl_PointCoord, 0.0, 1.0);
 
 在半径0-10、角度0-2xPI范围内随机出一个个顶点的 xy 坐标，将 z 统一设成0，依次放到数组里，再用 geometry.setAttribute 设置到顶点属性上，命名为 position，且通过 Float32BufferAttribute 表示该数组数据是三个为一组，组成 vec3，这样在顶点着色器里用 `attribute vec3 position` 就能声明和使用，只不过 ShaderMaterial 里 position 默认已经声明，所以直接用就行。
 
+```
+const geometry = new THREE.BufferGeometry();
+
+const positions = [];
+for (let i = 0; i < 5000; i++) {
+  const radius = 10 * Math.random();
+  const angle = Math.PI * 2 * Math.random();
+  const x = Math.sin(angle) * radius;
+  const y = Math.cos(angle) * radius;
+  positions.push(x, y, 0);
+}
+
+geometry.setAttribute(
+  "position",
+  new THREE.Float32BufferAttribute(positions, 3)
+);
+
+const material = new THREE.ShaderMaterial({ ... });
+const points = new THREE.Points(geometry, material);
+scene.add(points);
+
+```
+
+### 中心球体
+
+首先生成中心球体的顶点坐标。在 for 循环里分别生成5万个粒子的球体坐标、10万个粒子的圆盘坐标，统一放到 positions 数组里，再设置到一个 BufferGeometry 上，这里没有分成两个设置。
+
+原作里用 `THREE.Vector3().randomDirection()` 生成球体上的单位向量长度的顶点，然后设置向量长度到9.5-10作为球体半径。
+
+```
+const count1 = 50000;
+const count2 = 100000;
+const geometry = new THREE.BufferGeometry();
+const positions = [];
+for (let i = 0; i < count1 + count2; i++) {
+  // 球体部分
+  if (i < count1) {
+    let { x, y, z } = new THREE.Vector3()
+      .randomDirection()
+      .multiplyScalar(Math.random() * 0.5 + 9.5);
+    positions.push(x, y, z);
+  } else {
+    // 圆盘/圆柱部分
+  }
+}
+
+geometry.setAttribute(
+  "position",
+  new THREE.Float32BufferAttribute(positions, 3)
+);
+```
+
+![img](https://p3-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/0e2bdc4f979d445e9594764548cb5c20~tplv-k3u1fbpfcp-jj-mark:3024:0:0:0:q75.awebp#?w=296&h=298&s=17549&e=png&b=ffffff)
+
+我们用`0-2xPI 的方位角 theta、0-PI 的极角 phi、9.5-10的半径 r` 计算出球体上的任意顶点坐标 xyz，这里无需纠结 xyz 坐标系和上面配图不一样、哪个用 sin cos 等，直接按代码这么写效果ok就行。theta、phi 圆盘坐标里也用到所以写在 if 前面。
+
+```
+const count1 = 50000;
+const count2 = 100000;
+const geometry = new THREE.BufferGeometry();
+const positions = [];
+for (let i = 0; i < count1 + count2; i++) {
+  let theta = Math.random() * Math.PI * 2;
+  // let phi = Math.random() * Math.PI; // 两极密集
+  let phi = Math.acos(Math.random() * 2 - 1); // 分布更均匀
+  if (i < count1) {
+    // let r = 10;
+    let r = Math.random() * 0.5 + 9.5;
+    let x = r * Math.sin(phi) * Math.cos(theta);
+    let y = r * Math.cos(phi);
+    let z = r * Math.sin(phi) * Math.sin(theta);
+    positions.push(x, y, z);
+  } 
+   else {
+    // 圆盘/圆柱部分
+  }
+}
+```
+
+需要注意的是 phi 是通过反余弦函数 acos 对-1-1求出角度得到，这样顶点分布更均匀，直接通过 `Math.random() * Math.PI` 的话会不均匀、两极更密集。
+
+![image-20240510103528869](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240510103528869.png)
+
+### 粒子大小更随机
+
+为了使粒子大小更随机，可以给每个顶点设置一个随机值属性，这样在顶点着色器里就能使用。这里 size 值为0.5-2（具体范围可自行调整），对于球体和圆盘上的顶点都生成一个数值，通过 setAttribute 设置到几何体顶点属性上，在 Float32BufferAttribute 里表明一个顶点一个数值。然后在顶点着色器里通过 `attribute float aSize` 就能拿到数值，乘到 gl_PointSize 上即可。
+
+```
+const positions = [];
+const sizes = [];
+for (let i = 0; i < count1 + count2; i++) {
+  let theta = Math.random() * Math.PI * 2;
+  let phi = Math.acos(Math.random() * 2 - 1); // 分布更均匀
+
+  let size = Math.random() * 1.5 + 0.5; // 0.5-2.0
+  sizes.push(size);
+  // ...
+}
+
+geometry.setAttribute("aSize", new THREE.Float32BufferAttribute(sizes, 1));
+```
+
+### 应用颜色
+
+目前球体上下 position.y 的范围是-10-10，我们不妨将其除以10变到-1-1，再乘0.5加0.5变到0-1，然后在上下方向插值不同颜色。将颜色传给片元着色器并进行使用，此时 mask 仅用于 discard 舍弃掉圆圈外围的像素。
+
+```
+vec3 color1 = vec3(227., 155., 0.);
+vec3 color2 = vec3(100., 50., 255.);
+float d = fract(length(abs(position) / vec3(40., 10., 40.))*1000.0);
+d = clamp(d, 0., 1.);
+vColor = mix(color1, color2, d) / 255.;
+```
+
+在片元着色器里，计算每个顶点上的像素离自身中心的距离，然后大于0.5的舍弃，通过 smoothstep 设置透明度，距离小于0.1的取1，0.1-0.5的从1平滑过渡到到0，大于0.5的为0且会舍弃。这样粒子圆圈就会是模糊朦胧的效果。此时颜色很怪，因为透明度没生效，设置 transparent 为 true 颜色就正常了；设置 blending 为 THREE.AdditiveBlending 这样粒子重叠后的颜色会变白发亮，可以看到球体边缘一圈微微发亮。
+
+```
+float d = length(gl_PointCoord - 0.5);
+if (d > 0.5) discard;
+gl_FragColor = vec4(vColor, smoothstep(0.5, 0.1, d));
+```
+
+```
+const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+    },
+    vertexShader,
+    fragmentShader,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthTest: false,
+  });
+```
+
+### 让粒子动起来
+
+在2D里想让粒子在圆圈上运行，需要不断改变角度 angle，同样3D里想让粒子在球体上运动，需要改变 theta 和 phi 两个角度，就像地球仪上从一点到另一点要改变经度和纬度一般。
+
+让我们再给顶点属性上设置和运动相关的数值。theta 和 phi 可以定位出粒子初始位置，angle 为很小的随机角度值表示移动的角度大小或速率，strength 为0.1-1类似运动幅度，将这4个数值设置到每个顶点上。
+
+```
+const positions = [];
+const sizes = [];
+const shifts = [];
+for (let i = 0; i < count1 + count2; i++) {
+  let theta = Math.random() * Math.PI * 2;
+  let phi = Math.acos(Math.random() * 2 - 1);
+  let angle = (Math.random() * 0.9 + 0.1) * Math.PI * 0.1;
+  let strength = Math.random() * 0.9 + 0.1; // 0.1-1
+  shifts.push(theta, phi, angle, strength);
+
+  let size = Math.random() * 1.5 + 0.5;
+  sizes.push(size);
+  // ...
+}
+
+geometry.setAttribute("aShift", new THREE.Float32BufferAttribute(shifts, 4));
+```
+
+在顶点着色器里可以通过 xyzw 分别拿到 aShift 里的4个值。aShift.x 是原始 theta，加上 aShift.z * uTime 就是角度不断变化，mod 对 2xPI 取余数使角度不断在 0-2xPI 之间变化，从而得到新的 theta 角度；同理得到新的 phi 角度，注意这里 phi 也是要对 2xPI 取余数，虽然不太理解，但换成 PI 就会出现粒子闪烁的效果。
+
+```
+attribute float aSize;
+attribute vec4 aShift;
+uniform float uTime;
+varying vec3 vColor;
+
+const float PI = 3.1415925;
+
+void main() {
+  vec3 color1 = vec3(227., 155., 0.);
+  vec3 color2 = vec3(100., 50., 255.);
+
+  float d = length(abs(position) / vec3(40., 10., 40.));
+  d = clamp(d, 0., 1.);
+  vColor = mix(color1, color2, d) / 255.;
+
+  vec3 transformed = position;
+  float theta = mod(aShift.x + aShift.z * uTime, PI * 2.);
+  float phi = mod(aShift.y + aShift.z * uTime, PI * 2.);
+  transformed += vec3(sin(phi) * cos(theta), cos(phi), sin(phi) * sin(theta)) * aShift.w;
+
+  // vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0);
+  gl_PointSize = aSize * 50.0 / -mvPosition.z;
+  gl_Position = projectionMatrix * mvPosition;
+}
+```
+
+对于一维的点如x=10，加减一个速度值如0.1，然后乘时间就是 `x+0.1*t` 点就能运动起来；二维的点如 (x=10,y=20) 可以沿自身为中心周围一圈的任意方向去移动，可以通过`(cos(a), sin(a))`单位向量表示方向，同样乘时间就是 `(x,y)+(cos(a), sin(a))*t` 点就能运动起来；三维的点如 (x=10,y=20,z=30) 可以沿自身为中心周围一圈球体的任意方向去移动，可以通过 `sin(phi) * cos(theta), cos(phi), sin(phi) * sin(theta)` 单位向量表示方向，同样乘时间就是 `(x,y,z)+(sin(phi) * cos(theta), cos(phi), sin(phi) * sin(theta))*t` 点就能运动起来。
+
+所以这里的 theta、phi 其实是每个顶点处单位球体上的运动方向，而不是一开始中心球体的两个角度，两者根本不需要对齐、不需要相关，甚至不相关可能更好。shader 里直接对每个顶点坐标加上自己的运动方向乘以 aShift.w 运动幅度0.1-1，只不过因为该值较小，所以看起来粒子还像是在球体上运动，这就是运动的逻辑。因而 JS 里生成中心球体坐标的代码切换回原来 randomDirection 的方式。
+
+```
+// let x = r * Math.sin(phi) * Math.cos(theta);
+// let y = r * Math.cos(phi);
+// let z = r * Math.sin(phi) * Math.sin(theta);
+let { x, y, z } = new THREE.Vector3()
+.randomDirection()
+.multiplyScalar(r);
+```
+
+<video src="C:\Users\ouyang\AppData\Local\Packages\Microsoft.ScreenSketch_8wekyb3d8bbwe\TempState\Recordings\20240510-0538-49.3658852.mp4"></video>
+
+<video src="C:\Users\ouyang\AppData\Local\Packages\Microsoft.ScreenSketch_8wekyb3d8bbwe\TempState\Recordings\20240510-0653-23.1466996.mp4"></video>
+
+### 圆盘粒子
+
+粒子的颜色和运动都搞定后，最后把外围的圆盘粒子也补全，幸运的是上述颜色和运动都能沿用，所以很方便。
+
+圆盘粒子在半径10-40之间，通过 `THREE.Vector3().setFromCylindricalCoords()` 设置半径、角度、高度来随机生成。
+
+```
+const count1 = 50000;
+const count2 = 100000;
+const geometry = new THREE.BufferGeometry();
+const positions = [];
+const sizes = [];
+const shifts = [];
+for (let i = 0; i < count1 + count2; i++) {
+  let theta = Math.random() * Math.PI * 2;
+  let phi = Math.acos(Math.random() * 2 - 1);
+  let angle = (Math.random() * 0.9 + 0.1) * Math.PI * 0.1;
+  let strength = Math.random() * 0.9 + 0.1; // 0.1-1.0 radius
+  shifts.push(theta, phi, angle, strength);
+
+  let size = Math.random() * 1.5 + 0.5;
+  sizes.push(size);
+  
+  if (i < count1) {
+    // 中心球体粒子
+    let r = Math.random() * 0.5 + 9.5;
+    let { x, y, z } = new THREE.Vector3()
+      .randomDirection()
+      .multiplyScalar(r);
+    positions.push(x, y, z);
+  } else {
+    // 圆盘粒子
+    let r = 10;
+    let R = 40;
+    let rand = Math.pow(Math.random(), 1.5);
+    let radius = Math.sqrt(R * R * rand + (1 - rand) * r * r);
+    let { x, y, z } = new THREE.Vector3().setFromCylindricalCoords(
+      radius,
+      Math.random() * 2 * Math.PI,
+      (Math.random() - 0.5) * 2
+    );
+    positions.push(x, y, z);
+  }
+}
+```
+
+![image-20240510152437742](C:\Users\ouyang\AppData\Roaming\Typora\typora-user-images\image-20240510152437742.png)
+
+### 波动毛球
+
+将  `通过顶点着色器改变球体的位置`  一章最后的黄色毛球作为基础。
+
+#### 毛球外圈添加粒子
+
+我们通过 BufferGeometry() 设置粒子的 position，使 radius 稍大于中心球体，这样能包裹着球体。这里想要粒子在球体上均匀分布
+
+```
+const particleGeometry = new THREE.BufferGeometry();
+
+const N = 4000;
+const positions = new Float32Array(N * 3);
+
+const inc = Math.PI * (3 - Math.sqrt(5));
+const off = 2 / N;
+const radius = 2;
+
+for (let i = 0; i < N; i++) {
+  const k = i + 0.5;
+  const phi = Math.acos(1 - (2 * k) / N);
+  const theta = Math.PI * (1 + Math.sqrt(5)) * k;
+  const x = Math.cos(theta) * Math.sin(phi) * radius;
+  const y = Math.sin(theta) * Math.sin(phi) * radius;
+  const z = Math.cos(phi) * radius;
+
+  positions.set([x, y, z], i * 3);
+}
+
+particleGeometry.setAttribute(
+  "position",
+  new THREE.BufferAttribute(positions, 3)
+);
+```
+
+材质用 ShaderMaterial，粒子颜色设置了透明度，然后和 particleGeometry 一起丢给 Points 就行。
+
+```
+const particleVertex = /* GLSL */ `
+  uniform float uTime;
+
+  void main() {
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = 6.0 / -mvPosition.z;
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`;
+
+const particleFragment = /* GLSL */ `
+  void main() {
+    // gl_FragColor = vec4(vec3(1.0), 1.0);
+    gl_FragColor = vec4(vec3(1.0), 0.6);
+  }
+`;
+
+const particleMaterial = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+  },
+  vertexShader: particleVertex,
+  fragmentShader: particleFragment,
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+});
+
+const particles = new THREE.Points(particleGeometry, particleMaterial);
+scene.add(particles);
+
+function render() {
+  // ...
+  sphereMaterial.uniforms.uTime.value = time;
+  particleMaterial.uniforms.uTime.value = time;
+}
+```
+
+粒子上下波动
+
+```
+vec3 newPos = position;
+  newPos.y += 0.1 * sin(newPos.y * 6.0 + uTime);
+  // newPos.z += 0.05 * sin(newPos.y * 10.0 + uTime);
+
+  // vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  vec4 mvPosition = modelViewMatrix * vec4(newPos, 1.0);
+```
+
+粒子在z轴波动
+
+```
+newPos.z += 0.05 * sin(newPos.y * 10.0 + uTime);
+```
+
+<video src="C:\Users\ouyang\AppData\Local\Packages\Microsoft.ScreenSketch_8wekyb3d8bbwe\TempState\Recordings\20240510-0825-49.0286346.mp4"></video>
+
+#### 添加环境粒子
